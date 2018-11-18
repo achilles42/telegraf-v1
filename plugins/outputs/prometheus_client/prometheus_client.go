@@ -342,7 +342,7 @@ func (p *PrometheusClient) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func sanitize(value string) string {
+func Sanitize(value string) string {
 	return invalidNameCharRE.ReplaceAllString(value, "_")
 }
 
@@ -482,7 +482,7 @@ func (p *PrometheusClient) Write(metrics []telegraf.Metric) error {
 				Timestamp:    point.Time(),
 				Expiration:   now.Add(p.ExpirationInterval.Duration),
 			}
-			mname = sanitize(point.Name())
+			mname = Sanitize(point.Name())
 
 			if !isValidTagName(mname) {
 				continue
@@ -528,7 +528,7 @@ func (p *PrometheusClient) Write(metrics []telegraf.Metric) error {
 				Timestamp:      point.Time(),
 				Expiration:     now.Add(p.ExpirationInterval.Duration),
 			}
-			mname = sanitize(point.Name())
+			mname = Sanitize(point.Name())
 
 			if !isValidTagName(mname) {
 				continue
@@ -564,18 +564,18 @@ func (p *PrometheusClient) Write(metrics []telegraf.Metric) error {
 				switch point.Type() {
 				case telegraf.Counter:
 					if fn == "counter" {
-						mname = sanitize(point.Name())
+						mname = Sanitize(point.Name())
 					}
 				case telegraf.Gauge:
 					if fn == "gauge" {
-						mname = sanitize(point.Name())
+						mname = Sanitize(point.Name())
 					}
 				}
 				if mname == "" {
 					if fn == "value" {
-						mname = sanitize(point.Name())
+						mname = Sanitize(point.Name())
 					} else {
-						mname = sanitize(fmt.Sprintf("%s_%s", point.Name(), fn))
+						mname = Sanitize(fmt.Sprintf("%s_%s", point.Name(), fn))
 					}
 				}
 				if !isValidTagName(mname) {
