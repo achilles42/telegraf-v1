@@ -421,7 +421,7 @@ func (p *PrometheusClient) Write(metrics []telegraf.Metric) error {
 
 		labels := make(map[string]string)
 		for k, v := range tags {
-			tName := sanitize(k)
+			tName := Sanitize(k)
 			if !isValidTagName(tName) {
 				continue
 			}
@@ -434,7 +434,7 @@ func (p *PrometheusClient) Write(metrics []telegraf.Metric) error {
 			for fn, fv := range point.Fields() {
 				switch fv := fv.(type) {
 				case string:
-					tName := sanitize(fn)
+					tName := Sanitize(fn)
 					if !isValidTagName(tName) {
 						continue
 					}
