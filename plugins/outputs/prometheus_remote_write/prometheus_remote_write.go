@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -97,7 +98,7 @@ func (p *PrometheusRemoteWrite) Write(metrics []telegraf.Metric) error {
 			copy(labels, commonLabels)
 			labels = append(labels, prompb.Label{
 				Name:  "__name__",
-				Value: metric.Name() + "_" + field.Key,
+				Value: getSanitizedMetricName(metric.Name(), field.Key),
 			})
 			sort.Sort(byName(labels))
 
@@ -170,3 +171,7 @@ type byName []prompb.Label
 func (a byName) Len() int           { return len(a) }
 func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byName) Less(i, j int) bool { return a[i].Name < a[j].Name }
+
+func getSanitizedMetricName(name, field string) string {
+	return strings.ReplaceAll(name+"_"+field, ".", "_")
+}
