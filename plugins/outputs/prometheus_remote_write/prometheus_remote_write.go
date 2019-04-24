@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -17,6 +17,11 @@ import (
 	"github.com/influxdata/telegraf/internal/tls"
 	"github.com/influxdata/telegraf/plugins/outputs"
 	"github.com/influxdata/telegraf/plugins/outputs/prometheus_client"
+)
+
+var (
+	invalidNameCharRE = regexp.MustCompile(`[^a-zA-Z0-9_:]`)
+	validNameCharRE   = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`)
 )
 
 func init() {
@@ -83,6 +88,7 @@ func (p *PrometheusRemoteWrite) SampleConfig() string {
 func (p *PrometheusRemoteWrite) Write(metrics []telegraf.Metric) error {
 	var req prompb.WriteRequest
 
+	sort.Sort(byTimestamp(metrics))
 	for _, metric := range metrics {
 		tags := metric.TagList()
 		commonLabels := make([]prompb.Label, 0, len(tags))
@@ -94,11 +100,12 @@ func (p *PrometheusRemoteWrite) Write(metrics []telegraf.Metric) error {
 		}
 
 		for _, field := range metric.FieldList() {
+			metricName := getSanitizedMetricName(metric.Name(), field.Key)
 			labels := make([]prompb.Label, len(commonLabels), len(commonLabels)+1)
 			copy(labels, commonLabels)
 			labels = append(labels, prompb.Label{
 				Name:  "__name__",
-				Value: getSanitizedMetricName(metric.Name(), field.Key),
+				Value: metricName,
 			})
 			sort.Sort(byName(labels))
 
@@ -121,10 +128,11 @@ func (p *PrometheusRemoteWrite) Write(metrics []telegraf.Metric) error {
 				continue
 			}
 
+			ts := metric.Time().UnixNano() / int64(time.Millisecond)
 			req.Timeseries = append(req.Timeseries, prompb.TimeSeries{
 				Labels: labels,
 				Samples: []prompb.Sample{{
-					Timestamp: metric.Time().UnixNano() / int64(time.Millisecond),
+					Timestamp: ts,
 					Value:     value,
 				}},
 			})
@@ -172,6 +180,16 @@ func (a byName) Len() int           { return len(a) }
 func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byName) Less(i, j int) bool { return a[i].Name < a[j].Name }
 
+type byTimestamp []telegraf.Metric
+
+func (a byTimestamp) Len() int           { return len(a) }
+func (a byTimestamp) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byTimestamp) Less(i, j int) bool { return a[j].Time().After(a[i].Time()) }
+
 func getSanitizedMetricName(name, field string) string {
-	return strings.ReplaceAll(name+"_"+field, ".", "_")
+	return sanitize(fmt.Sprintf("%s_%s", name, field))
+}
+
+func sanitize(value string) string {
+	return invalidNameCharRE.ReplaceAllString(value, "_")
 }
