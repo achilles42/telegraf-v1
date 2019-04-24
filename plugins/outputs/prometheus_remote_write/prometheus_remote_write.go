@@ -85,11 +85,24 @@ func (p *PrometheusRemoteWrite) SampleConfig() string {
 	return sampleConfig
 }
 
+// Sorted returns a copy of the metrics in time ascending order.  A copy is
+// made to avoid modifying the input metric slice since doing so is not
+// allowed.
+func sorted(metrics []telegraf.Metric) []telegraf.Metric {
+	batch := make([]telegraf.Metric, 0, len(metrics))
+	for i := len(metrics) - 1; i >= 0; i-- {
+		batch = append(batch, metrics[i])
+	}
+	sort.Slice(batch, func(i, j int) bool {
+		return batch[i].Time().Before(batch[j].Time())
+	})
+	return batch
+}
+
 func (p *PrometheusRemoteWrite) Write(metrics []telegraf.Metric) error {
 	var req prompb.WriteRequest
 
-	sort.Sort(byTimestamp(metrics))
-	for _, metric := range metrics {
+	for _, metric := range sorted(metrics) {
 		tags := metric.TagList()
 		commonLabels := make([]prompb.Label, 0, len(tags))
 		for _, tag := range tags {
@@ -179,12 +192,6 @@ type byName []prompb.Label
 func (a byName) Len() int           { return len(a) }
 func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byName) Less(i, j int) bool { return a[i].Name < a[j].Name }
-
-type byTimestamp []telegraf.Metric
-
-func (a byTimestamp) Len() int           { return len(a) }
-func (a byTimestamp) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byTimestamp) Less(i, j int) bool { return a[j].Time().After(a[i].Time()) }
 
 func getSanitizedMetricName(name, field string) string {
 	return sanitize(fmt.Sprintf("%s_%s", name, field))
