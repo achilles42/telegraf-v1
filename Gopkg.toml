@@ -281,6 +281,7 @@
   name = "github.com/google/go-github"
   version = "24.0.1"
 
+# Prometheus uses go modules so this transitive dependancy isn't pulled properly.
 [[override]]
   name = "github.com/grpc-ecosystem/grpc-gateway"
   version = "1.6.3"
